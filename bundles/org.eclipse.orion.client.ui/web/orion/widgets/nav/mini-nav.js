@@ -169,25 +169,17 @@ define(['require', 'i18n!orion/edit/nls/messages', 'orion/objects', 'orion/webui
 			var func = function () {
 				var tree = _self.myTree;
 				if (!tree) { return; }
-				var startIndex = -1;
+				var parents = [];
 				for (var i=0; i<fileMetadata.Parents.length; i++) {
 					var parent = fileMetadata.Parents[i];
 					if (parent.Location === _self.treeRoot.Location || tree.isExpanded(parent)) {
-						startIndex = i;
 						break;
 					}
+					parents.push(parent);
 				}
-				if (startIndex === -1) {
-					startIndex = fileMetadata.Parents.length;
-				}
-				var postExpand = function (startIndex) {
-					if (startIndex < 0) {
-						_self.reveal(fileMetadata);
-						return;
-					}
-					tree.expand(fileMetadata.Parents[startIndex], postExpand, [startIndex-1]);
-				};
-				postExpand(startIndex-1);
+				tree.expandAll(parents.reverse(), function() {
+					_self.reveal(fileMetadata);
+				});
 			};
 			
 			if (this.fileInCurrentTree(fileMetadata)) {

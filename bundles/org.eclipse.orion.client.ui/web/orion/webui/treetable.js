@@ -117,7 +117,7 @@ define(['i18n!orion/nls/messages', 'orion/webui/littlelib'], function(messages, 
 			this._rowsChanged();
 		},
 		
-		_generateChildren: function(children, indentLevel, referenceNode) {
+		_generateChildren: function(children, indentLevel, referenceNode, parent) {
 			for (var i=0; i<children.length; i++) {
 				var row = document.createElement(this._tableRowElement); //$NON-NLS-0$
 				row.id = this._treeModel.getId(children[i]);
@@ -134,12 +134,12 @@ define(['i18n!orion/nls/messages', 'orion/webui/littlelib'], function(messages, 
 				var indent = this._indent * indentLevel;
 				row.childNodes[this._labelColumnIndex].style.paddingLeft = indent +"px";  //$NON-NLS-0$
 				if (referenceNode) {
-					this._bodyElement.insertBefore(row, referenceNode.nextSibling);
+					(parent || this._bodyElement).insertBefore(row, referenceNode.nextSibling);
 					if (referenceNode) { //$NON-NLS-0$
 						referenceNode = row;
 					}
 				} else {
-					this._bodyElement.appendChild(row);
+					(parent || this._bodyElement).appendChild(row);
 				}
 			}
 		},
@@ -201,32 +201,38 @@ define(['i18n!orion/nls/messages', 'orion/webui/littlelib'], function(messages, 
 			return itemOrId;  // return what we were given
 		},
 		
-		toggle: function(id) {
-			var row = lib.node(id);
+		toggle: function(itemOrId) {
+			var row = this.getRow(itemOrId);
 			if (row) {
 				if (row._expanded) {
-					this.collapse(id);
+					this.collapse(row.id);
 					this._renderer.updateExpandVisuals(row, false);
 				}
 				else {
-					this.expand(id);
+					this.expand(row.id);
 					this._renderer.updateExpandVisuals(row, true);
 				}
 			}
 		},
 		
 		isExpanded: function(itemOrId) {
-			var id = typeof(itemOrId) === "string" ? itemOrId : this._treeModel.getId(itemOrId); //$NON-NLS-0$
-			var row =lib.node(id);
+			var row = this.getRow(itemOrId);
 			if (row) {
 				return row._expanded;
 			}
 			return false;
 		},
 		
+		getId: function(itemOrId) {
+			return typeof(itemOrId) === "string" ? itemOrId : this._treeModel.getId(itemOrId); //$NON-NLS-0$
+		},
+		
+		getRow: function(itemOrId) {
+			return lib.node(this.getId(itemOrId));
+		},
+		
 		expand: function(itemOrId , postExpandFunc , args) {
-			var id = typeof(itemOrId) === "string" ? itemOrId : this._treeModel.getId(itemOrId); //$NON-NLS-0$
-			var row = lib.node(id);
+			var row = this.getRow(itemOrId);
 			if (row) {
 				if (row._expanded) {
 					return;
@@ -241,6 +247,48 @@ define(['i18n!orion/nls/messages', 'orion/webui/littlelib'], function(messages, 
 						postExpandFunc.apply(tree, args);
 					}
 				});
+			}
+		},
+		
+		expandAll: function(parents, postExpandFunc, args) {
+			var tree = this;
+			function expand(index, fragment) {
+				var id = tree.getId(parents[index]);
+				var row;
+				if (index === 0) {
+					row = lib.node(id);
+				} else {
+					var children = fragment.childNodes;
+					for (var i = 0; i < children.length; i++) {
+						if (children[i].id === id) {
+							row = children[i];
+							break;
+						}
+					}
+				}
+				if (row) {
+					row._expanded = true;
+					tree._renderer.updateExpandVisuals(row, true);
+					tree._treeModel.getChildren(row._item, function(children) {
+						tree._generateChildren(children, row._depth+1, index === 0 ? null : row, fragment);
+						if (index === parents.length - 1) {
+							tree._bodyElement.insertBefore(fragment, tree.getRow(parents[0]).nextSibling);
+							tree._rowsChanged();
+							if (postExpandFunc) {
+								postExpandFunc.apply(tree, args);
+							}
+						} else {
+							expand(index + 1, fragment);
+						}
+					});
+				}
+			}
+			if (parents.length > 0) {
+				expand(0, document.createDocumentFragment());
+			} else {
+				if (postExpandFunc) {
+					postExpandFunc.apply(tree, args);
+				}
 			}
 		}, 
 		
@@ -277,15 +325,14 @@ define(['i18n!orion/nls/messages', 'orion/webui/littlelib'], function(messages, 
 		},
 		
 		collapse: function(itemOrId) {
-			var id = typeof(itemOrId) === "string" ? itemOrId : this._treeModel.getId(itemOrId); //$NON-NLS-0$
-			var row = lib.node(id);
+			var row = this.getRow(itemOrId);
 			if (row) {
 				if (!row._expanded) {
 					return;
 				}
 				row._expanded = false;
 				this._renderer.updateExpandVisuals(row, false);
-				this._removeChildRows(id);
+				this._removeChildRows(row.id);
 				this._rowsChanged();
 			}
 			if(this._onCollapse){
