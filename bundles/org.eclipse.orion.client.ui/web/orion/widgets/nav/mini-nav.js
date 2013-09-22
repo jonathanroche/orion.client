@@ -169,6 +169,10 @@ define(['require', 'i18n!orion/edit/nls/messages', 'orion/objects', 'orion/webui
 			var func = function () {
 				var tree = _self.myTree;
 				if (!tree) { return; }
+				if (!fileMetadata.Parents) {
+//					_self.collapseAll();
+					return;
+				}
 				var parents = [];
 				for (var i=0; i<fileMetadata.Parents.length; i++) {
 					var parent = fileMetadata.Parents[i];
